@@ -1,0 +1,29 @@
+serviceName: vendor-portal
+namespace: martketplace-vkr
+
+replicas: 1
+
+containerPort: 80
+
+service:
+  type: ClusterIP
+  port: 80
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 32Mi
+  limits:
+    cpu: 50m
+    memory: 32Mi
+
+ingress:
+  enabled: true
+  host: marketplace-vendor.vitalmeuble.online
+  port: 8000
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  tls:
+    - hosts:
+        - marketplace-vendor.vitalmeuble.online
+      secretName: marketplace-vendor-vitalmeuble-tls
