@@ -11,9 +11,13 @@ export function ReviewsPage({
   onReplyChange,
   onDisputeChange,
   onReply,
+  onDeleteReply,
   onDispute,
+  onCancelDispute,
 }) {
   const [activeFilter, setActiveFilter] = useState('all')
+  const [replyModalReview, setReplyModalReview] = useState(null)
+  const [disputeModalReview, setDisputeModalReview] = useState(null)
   const productById = useMemo(() => new Map(products.map((product) => [getProductId(product), product])), [products])
   const stats = useMemo(() => buildReviewStats(reviews), [reviews])
   const filteredReviews = useMemo(
@@ -25,15 +29,34 @@ export function ReviewsPage({
     { id: 'unanswered', label: 'Без ответа', count: stats.unanswered },
     { id: 'disputed', label: 'Спорные', count: stats.disputed },
   ]
+  const closeReplyModal = () => setReplyModalReview(null)
+  const closeDisputeModal = () => setDisputeModalReview(null)
+
+  function openReplyModal(review) {
+    const reviewId = toText(review?.id)
+    onReplyChange(reviewId, toText(review?.reply?.comment))
+    setReplyModalReview(review)
+  }
+
+  function openDisputeModal(review) {
+    const reviewId = toText(review?.id)
+    onDisputeChange(reviewId, toText(review?.dispute?.reason))
+    setDisputeModalReview(review)
+  }
 
   return (
     <div className="page-stack">
       <section className="surface-panel page-header-panel reviews-hero-panel">
         <div>
           <h1>Отзывы</h1>
-          <p>Отзывы покупателей по вашим товарам, ответы и спорные обращения к администратору.</p>
+          <p>Отзывы покупателей по вашим товарам, ответы и обращения к администратору.</p>
         </div>
-        <button className="primary-action secondary-action" type="button" onClick={onReloadReviews} disabled={busyKeys.reviews}>
+        <button
+          className="review-action-button review-action-button-ghost"
+          type="button"
+          onClick={onReloadReviews}
+          disabled={busyKeys.reviews}
+        >
           {busyKeys.reviews ? 'Обновляем...' : 'Обновить'}
         </button>
       </section>
@@ -122,41 +145,129 @@ export function ReviewsPage({
                   </div>
                 ) : null}
 
-                <div className="review-admin-action-grid">
-                  <div className="review-action-box">
-                    <label htmlFor={`reply-${reviewId}`}>Ответ продавца</label>
-                    <textarea
-                      id={`reply-${reviewId}`}
-                      className="field-control review-action-input"
-                      value={replyForms[reviewId] || ''}
-                      onChange={(event) => onReplyChange(reviewId, event.target.value)}
-                      placeholder={reply ? 'Обновить ответ' : 'Напишите ответ покупателю'}
-                      rows={3}
-                    />
-                    <button className="primary-action" type="button" onClick={() => onReply(reviewId)} disabled={busyKeys[`reviewReply-${reviewId}`]}>
-                      {busyKeys[`reviewReply-${reviewId}`] ? 'Сохраняем...' : reply ? 'Обновить ответ' : 'Ответить'}
+                <div className="review-card-actions">
+                  <button className="review-action-button review-action-button-primary" type="button" onClick={() => openReplyModal(review)}>
+                    {reply ? 'Изменить ответ' : 'Ответить'}
+                  </button>
+                  {reply ? (
+                    <button
+                      className="review-action-button review-action-button-danger"
+                      type="button"
+                      onClick={() => onDeleteReply(reviewId)}
+                      disabled={busyKeys[`reviewReplyDelete-${reviewId}`]}
+                    >
+                      {busyKeys[`reviewReplyDelete-${reviewId}`] ? 'Удаляем...' : 'Удалить ответ'}
                     </button>
-                  </div>
-
-                  <div className="review-action-box">
-                    <label htmlFor={`dispute-${reviewId}`}>Оспорить отзыв</label>
-                    <input
-                      id={`dispute-${reviewId}`}
-                      className="field-control review-action-input"
-                      value={disputeForms[reviewId] || ''}
-                      onChange={(event) => onDisputeChange(reviewId, event.target.value)}
-                      placeholder="Почему отзыв несправедливый"
-                    />
-                    <button className="primary-action secondary-action" type="button" onClick={() => onDispute(reviewId)} disabled={busyKeys[`reviewDispute-${reviewId}`]}>
-                      {busyKeys[`reviewDispute-${reviewId}`] ? 'Отправляем...' : 'Оспорить'}
+                  ) : null}
+                  <button className="review-action-button review-action-button-secondary" type="button" onClick={() => openDisputeModal(review)}>
+                    {dispute ? 'Изменить спор' : 'Оспорить'}
+                  </button>
+                  {isPendingDispute(dispute) ? (
+                    <button
+                      className="review-action-button review-action-button-warning"
+                      type="button"
+                      onClick={() => onCancelDispute(reviewId)}
+                      disabled={busyKeys[`reviewDisputeCancel-${reviewId}`]}
+                    >
+                      {busyKeys[`reviewDisputeCancel-${reviewId}`] ? 'Отзываем...' : 'Отозвать спор'}
                     </button>
-                  </div>
+                  ) : null}
                 </div>
               </article>
             )
           })
         )}
         </div>
+      </section>
+
+      {replyModalReview ? (
+        <ReviewModal title={replyModalReview.reply ? 'Изменить ответ' : 'Ответить покупателю'} onClose={closeReplyModal}>
+          <div className="review-modal-form">
+            <label htmlFor={`reply-modal-${toText(replyModalReview.id)}`}>Ответ продавца</label>
+            <textarea
+              id={`reply-modal-${toText(replyModalReview.id)}`}
+              className="field-control review-action-input"
+              value={replyForms[toText(replyModalReview.id)] || ''}
+              onChange={(event) => onReplyChange(toText(replyModalReview.id), event.target.value)}
+              placeholder="Напишите ответ покупателю"
+              rows={5}
+            />
+            <div className="review-modal-actions">
+              <button
+                className="review-action-button review-action-button-primary"
+                type="button"
+                onClick={async () => {
+                  if (await onReply(toText(replyModalReview.id))) {
+                    closeReplyModal()
+                  }
+                }}
+                disabled={busyKeys[`reviewReply-${toText(replyModalReview.id)}`]}
+              >
+                {busyKeys[`reviewReply-${toText(replyModalReview.id)}`] ? 'Сохраняем...' : replyModalReview.reply ? 'Обновить ответ' : 'Опубликовать ответ'}
+              </button>
+              <button className="review-action-button review-action-button-ghost" type="button" onClick={closeReplyModal}>
+                Отмена
+              </button>
+            </div>
+          </div>
+        </ReviewModal>
+      ) : null}
+
+      {disputeModalReview ? (
+        <ReviewModal title={disputeModalReview.dispute ? 'Изменить спор' : 'Оспорить отзыв'} onClose={closeDisputeModal}>
+          <div className="review-modal-form">
+            <label htmlFor={`dispute-modal-${toText(disputeModalReview.id)}`}>Причина обращения к администратору</label>
+            <textarea
+              id={`dispute-modal-${toText(disputeModalReview.id)}`}
+              className="field-control review-action-input"
+              value={disputeForms[toText(disputeModalReview.id)] || ''}
+              onChange={(event) => onDisputeChange(toText(disputeModalReview.id), event.target.value)}
+              placeholder="Почему отзыв несправедливый"
+              rows={4}
+            />
+            <div className="review-modal-actions">
+              <button
+                className="review-action-button review-action-button-secondary"
+                type="button"
+                onClick={async () => {
+                  if (await onDispute(toText(disputeModalReview.id))) {
+                    closeDisputeModal()
+                  }
+                }}
+                disabled={busyKeys[`reviewDispute-${toText(disputeModalReview.id)}`]}
+              >
+                {busyKeys[`reviewDispute-${toText(disputeModalReview.id)}`] ? 'Отправляем...' : 'Отправить спор'}
+              </button>
+              <button className="review-action-button review-action-button-ghost" type="button" onClick={closeDisputeModal}>
+                Отмена
+              </button>
+            </div>
+          </div>
+        </ReviewModal>
+      ) : null}
+    </div>
+  )
+}
+
+function ReviewModal({ title, children, onClose }) {
+  return (
+    <div
+      className="review-modal-overlay"
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) {
+          onClose()
+        }
+      }}
+    >
+      <section className="review-modal-card" role="dialog" aria-modal="true" aria-labelledby="review-modal-title">
+        <div className="review-modal-head">
+          <h2 id="review-modal-title">{title}</h2>
+          <button className="review-modal-close" type="button" onClick={onClose} aria-label="Закрыть">
+            ×
+          </button>
+        </div>
+        {children}
       </section>
     </div>
   )
@@ -199,6 +310,10 @@ function formatDisputeStatus(status) {
   }
 
   return 'на проверке'
+}
+
+function isPendingDispute(dispute) {
+  return toText(dispute?.status).trim().toLowerCase() === 'pending'
 }
 
 function buildReviewStats(reviews) {

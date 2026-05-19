@@ -718,7 +718,7 @@ export function useVendorPortalController() {
     const comment = toText(reviewReplyForms[reviewId]).trim()
     if (!comment) {
       notify('Введите ответ продавца.', 'warning')
-      return
+      return false
     }
 
     setBusy(`reviewReply-${reviewId}`, true)
@@ -734,10 +734,34 @@ export function useVendorPortalController() {
         setReviewReplyForms((current) => ({ ...current, [reviewId]: '' }))
       })
       notify('Ответ опубликован.', 'success')
+      return true
     } catch (error) {
       handleError(error)
+      return false
     } finally {
       setBusy(`reviewReply-${reviewId}`, false)
+    }
+  }
+
+  async function handleDeleteReviewReply(reviewId) {
+    setBusy(`reviewReplyDelete-${reviewId}`, true)
+
+    try {
+      const response = await authedRequest(`/api/v1/vendor/reviews/${encodeURIComponent(reviewId)}/reply`, {
+        method: 'DELETE',
+      })
+
+      startTransition(() => {
+        setReviews((current) => current.map((review) => (toText(review?.id) === toText(reviewId) ? response.review || review : review)))
+        setReviewReplyForms((current) => ({ ...current, [reviewId]: '' }))
+      })
+      notify('Ответ удален.', 'success')
+      return true
+    } catch (error) {
+      handleError(error)
+      return false
+    } finally {
+      setBusy(`reviewReplyDelete-${reviewId}`, false)
     }
   }
 
@@ -756,10 +780,34 @@ export function useVendorPortalController() {
         setReviewDisputeForms((current) => ({ ...current, [reviewId]: '' }))
       })
       notify('Отзыв отправлен администратору.', 'success')
+      return true
     } catch (error) {
       handleError(error)
+      return false
     } finally {
       setBusy(`reviewDispute-${reviewId}`, false)
+    }
+  }
+
+  async function handleCancelReviewDispute(reviewId) {
+    setBusy(`reviewDisputeCancel-${reviewId}`, true)
+
+    try {
+      const response = await authedRequest(`/api/v1/vendor/reviews/${encodeURIComponent(reviewId)}/disputes`, {
+        method: 'DELETE',
+      })
+
+      startTransition(() => {
+        setReviews((current) => current.map((review) => (toText(review?.id) === toText(reviewId) ? response.review || review : review)))
+        setReviewDisputeForms((current) => ({ ...current, [reviewId]: '' }))
+      })
+      notify('Спор отозван.', 'success')
+      return true
+    } catch (error) {
+      handleError(error)
+      return false
+    } finally {
+      setBusy(`reviewDisputeCancel-${reviewId}`, false)
     }
   }
 
@@ -1037,7 +1085,9 @@ export function useVendorPortalController() {
         onReplyChange: handleReviewReplyChange,
         onDisputeChange: handleReviewDisputeChange,
         onReply: handleReviewReply,
+        onDeleteReply: handleDeleteReviewReply,
         onDispute: handleReviewDispute,
+        onCancelDispute: handleCancelReviewDispute,
       },
       profile: {
         profileForm,
