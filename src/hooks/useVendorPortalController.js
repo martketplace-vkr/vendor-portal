@@ -683,7 +683,7 @@ export function useVendorPortalController() {
     try {
       const response = await authedRequest(`/api/v1/vendor/orders/${orderId}`, {
         method: 'PATCH',
-        body: { status: nextStatus },
+        body: { fulfillment_status: nextStatus },
       })
       const updatedOrder = response.order
 

@@ -3,15 +3,11 @@ import { formatDateTime, formatPrice, shortText, toText } from '../helpers'
 
 const ORDER_STATUS_OPTIONS = [
   { value: 'created', label: 'Создан' },
-  { value: 'waiting_for_payment', label: 'Ожидает оплаты' },
   { value: 'assembly', label: 'В сборке' },
-  { value: 'delivery_to_pick_up', label: 'Передан в доставку до ПВЗ' },
   { value: 'delivery_to_client', label: 'Передан курьеру' },
   { value: 'waiting_pick_up', label: 'Ждет получения' },
   { value: 'success', label: 'Получен' },
-  { value: 'cancelled_by_client', label: 'Отменен покупателем' },
   { value: 'cancelled_by_seller', label: 'Отменен продавцом' },
-  { value: 'cancelled', label: 'Отменен' },
 ]
 
 const STATUS_FILTERS = [
@@ -23,19 +19,27 @@ const STATUS_FILTERS = [
 ]
 
 const STATUS_GROUPS = {
-  new: new Set(['created', 'waiting_for_payment']),
+  new: new Set(['created']),
   work: new Set(['assembly']),
-  delivery: new Set(['delivery_to_pick_up', 'delivery_to_client', 'waiting_pick_up']),
-  done: new Set(['success', 'cancelled_by_client', 'cancelled_by_seller', 'cancelled']),
+  delivery: new Set(['delivery_to_client', 'waiting_pick_up']),
+  done: new Set(['success', 'cancelled_by_seller']),
 }
 
 const NEXT_STATUS_BY_STATUS = {
   created: ['assembly', 'cancelled_by_seller'],
-  waiting_for_payment: ['assembly', 'cancelled_by_seller'],
-  assembly: ['delivery_to_pick_up', 'delivery_to_client', 'cancelled_by_seller'],
-  delivery_to_pick_up: ['waiting_pick_up', 'success'],
+  assembly: ['delivery_to_client', 'cancelled_by_seller'],
   delivery_to_client: ['success'],
   waiting_pick_up: ['success'],
+}
+
+const PAYMENT_STATUS_LABELS = {
+  pending_funds: 'Ожидает средств',
+  reserved: 'Средства зарезервированы',
+  captured: 'Оплачено',
+  released: 'Резерв снят',
+  expired: 'Истекло время оплаты',
+  cancelled: 'Отменено',
+  failed: 'Ошибка оплаты',
 }
 
 export function OrdersPage({ orders, busyKeys, onReloadOrders, onUpdateOrderStatus }) {
@@ -150,6 +154,7 @@ export function OrdersPage({ orders, busyKeys, onReloadOrders, onUpdateOrderStat
                       <p>{shortText(getOrderMeta(order), 150)}</p>
                       <div className="vendor-order-card__meta">
                         <span>Checkout: {getOrderCheckoutId(order) || 'без номера'}</span>
+                        <span>Оплата: {getPaymentStatusLabel(getOrderPaymentStatus(order))}</span>
                         <span>Создан: {formatDateTime(getOrderCreatedAt(order))}</span>
                         <span>Обновлен: {formatDateTime(getOrderUpdatedAt(order))}</span>
                       </div>
@@ -273,7 +278,11 @@ function getOrderCheckoutId(order) {
 }
 
 function getOrderStatus(order) {
-  return normalizeStatus(order?.status)
+  return normalizeStatus(order?.fulfillmentStatus ?? order?.fulfillment_status ?? order?.status)
+}
+
+function getOrderPaymentStatus(order) {
+  return normalizeStatus(order?.paymentStatus ?? order?.payment_status)
 }
 
 function getOrderProduct(order) {
@@ -317,18 +326,18 @@ function getOrderMeta(order) {
 function getOrderStatusLabel(status) {
   const labels = {
     created: 'Создан',
-    waiting_for_payment: 'Ожидает оплаты',
     assembly: 'В сборке',
-    delivery_to_pick_up: 'Передан в доставку до ПВЗ',
     delivery_to_client: 'Передан курьеру',
     waiting_pick_up: 'Ждет получения',
     success: 'Получен',
-    cancelled_by_client: 'Отменен покупателем',
     cancelled_by_seller: 'Отменен продавцом',
-    cancelled: 'Отменен',
   }
 
   return labels[normalizeStatus(status)] || toText(status) || 'Неизвестно'
+}
+
+function getPaymentStatusLabel(status) {
+  return PAYMENT_STATUS_LABELS[normalizeStatus(status)] || toText(status) || 'Неизвестно'
 }
 
 function normalizeStatus(status) {
