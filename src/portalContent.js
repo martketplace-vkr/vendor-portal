@@ -3,6 +3,7 @@ export const portalNavItems = [
   { path: '/dashboard', page: 'dashboard', label: 'Пульс' },
   { path: '/orders', page: 'orders', label: 'Заказы' },
   { path: '/reviews', page: 'reviews', label: 'Отзывы' },
+  { path: '/accounts', page: 'accounts', label: 'Счета' },
   { path: '/products', page: 'products', label: 'Товары' },
   { path: '/inventory', page: 'inventory', label: 'Остатки' },
   { path: '/profile', page: 'profile', label: 'Профиль' },

@@ -3,6 +3,7 @@ import { Sidebar } from './components/layout/Sidebar'
 import { ToastHost } from './components/layout/ToastHost'
 import { useVendorPortalController } from './hooks/useVendorPortalController'
 import { AuthPage } from './pages/AuthPage'
+import { AccountsPage } from './pages/AccountsPage'
 import { AnalyticsPage } from './pages/AnalyticsPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { InventoryPage } from './pages/InventoryPage'
@@ -69,6 +70,10 @@ function renderCurrentPage(controller) {
 
   if (controller.route.page === 'analytics') {
     return <AnalyticsPage {...controller.pageProps.analytics} />
+  }
+
+  if (controller.route.page === 'accounts') {
+    return <AccountsPage {...controller.pageProps.accounts} />
   }
 
   if (controller.route.page === 'products') {

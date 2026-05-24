@@ -2484,3 +2484,61 @@
     width: 100%;
   }
 }
+.account-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.account-filter {
+  width: min(220px, 100%);
+}
+
+.account-transaction-list {
+  display: grid;
+  gap: 10px;
+}
+
+.account-transaction {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.account-transaction__main,
+.account-transaction__meta,
+.account-entry-list {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.account-transaction__meta {
+  color: var(--muted-text, #64748b);
+  font-size: 0.9rem;
+}
+
+.account-entry-list {
+  justify-content: flex-start;
+}
+
+.account-entry {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: rgba(22, 163, 74, 0.1);
+  color: #166534;
+  font-weight: 700;
+}
+
+.account-entry--debit {
+  background: rgba(220, 38, 38, 0.1);
+  color: #991b1b;
+}

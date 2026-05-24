@@ -43,6 +43,10 @@ export function readRoute() {
     return { page: 'analytics' }
   }
 
+  if (cleanPath === '/accounts') {
+    return { page: 'accounts' }
+  }
+
   if (cleanPath === '/profile') {
     return { page: 'profile' }
   }

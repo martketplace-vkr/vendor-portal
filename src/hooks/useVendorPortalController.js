@@ -75,6 +75,10 @@ const PAGE_COPY = {
     title: 'Профиль вендора',
     description: 'Личные данные, email и контекст учетной записи.',
   },
+  accounts: {
+    title: 'Счета',
+    description: 'Балансы продавца и история финансовых операций.',
+  },
   notFound: {
     title: 'Маршрут не найден',
     description: 'Проверьте путь или вернитесь в пульс кабинета.',
@@ -105,6 +109,9 @@ export function useVendorPortalController() {
   const [productForm, setProductForm] = useState(() => readProductCreateDraft() || { ...emptyProductForm })
   const [productCosts, setProductCosts] = useState({})
   const [analytics, setAnalytics] = useState(() => ({ overview: null, niches: [], products: [] }))
+  const [accountWallet, setAccountWallet] = useState(null)
+  const [accountTransactions, setAccountTransactions] = useState([])
+  const [accountCurrencyFilter, setAccountCurrencyFilter] = useState('')
   const [analyticsPeriod, setAnalyticsPeriod] = useState(() => buildPeriod(30))
   const [selectedProductId, setSelectedProductId] = useState('')
   const [search, setSearch] = useState('')
@@ -274,6 +281,7 @@ export function useVendorPortalController() {
       loadVendorProducts(profile.id, token),
       loadVendorOrders(token),
       loadVendorReviews(token),
+      loadVendorAccounts(token),
     ])
   }
 
@@ -388,6 +396,36 @@ export function useVendorPortalController() {
     } finally {
       setBusy('analytics', false)
     }
+  }
+
+  async function loadVendorAccounts(token = accessToken, currencyCode = accountCurrencyFilter) {
+    setBusy('accounts', true)
+
+    const params = new URLSearchParams({ limit: '50', offset: '0' })
+    if (currencyCode) {
+      params.set('currency_code', currencyCode)
+    }
+
+    try {
+      const [walletResponse, transactionsResponse] = await Promise.all([
+        apiRequest('/api/v1/vendor/balance/wallet', { token }),
+        apiRequest(`/api/v1/vendor/balance/transactions?${params.toString()}`, { token }),
+      ])
+
+      startTransition(() => {
+        setAccountWallet(walletResponse.wallet || null)
+        setAccountTransactions(transactionsResponse.transactions || [])
+      })
+    } catch (error) {
+      handleError(error)
+    } finally {
+      setBusy('accounts', false)
+    }
+  }
+
+  function updateAccountCurrencyFilter(value) {
+    setAccountCurrencyFilter(value)
+    void loadVendorAccounts(accessToken, value)
   }
 
   async function ensureAuthorized() {
@@ -929,6 +967,9 @@ export function useVendorPortalController() {
       setReviewDisputeForms({})
       setProductCosts({})
       setAnalytics({ overview: null, niches: [], products: [] })
+      setAccountWallet(null)
+      setAccountTransactions([])
+      setAccountCurrencyFilter('')
       setSelectedProductId('')
       setProductForm({ ...emptyProductForm })
     })
@@ -1023,6 +1064,14 @@ export function useVendorPortalController() {
         onPeriodPreset: setAnalyticsPeriodPreset,
         onPeriodChange: updateAnalyticsPeriod,
         onDownloadReport: downloadAnalyticsReport,
+      },
+      accounts: {
+        wallet: accountWallet,
+        transactions: accountTransactions,
+        currencyFilter: accountCurrencyFilter,
+        busyKeys,
+        onCurrencyFilterChange: updateAccountCurrencyFilter,
+        onReload: () => loadVendorAccounts(),
       },
       products: {
         categories: categoryOptions,
