@@ -17,7 +17,7 @@ export function AnalyticsPage({
   onDownloadReport,
 }) {
   const kpi = analytics.overview?.kpi || {}
-  const trend = analytics.overview?.trend || []
+  const trend = buildCompleteTrend(analytics.overview?.trend || [], period)
   const niches = analytics.niches || []
   const products = analytics.products || []
   const highMargin = products.filter((product) => product.has_cost).sort((left, right) => right.margin_percent - left.margin_percent).slice(0, 5)
@@ -126,6 +126,7 @@ export function AnalyticsPage({
                 series={productSalesSeries}
                 trend={trend}
                 valueFormatter={formatUnits}
+                filterable
               />
             )}
           </div>
@@ -234,14 +235,16 @@ function EmptyAnalytics({ message }) {
   return <div className="empty-panel analytics-empty">{message}</div>
 }
 
-function TrendAreaChart({ trend, series, valueFormatter }) {
+function TrendAreaChart({ trend, series, valueFormatter, filterable = false }) {
   const [activeIndex, setActiveIndex] = useState(null)
+  const [selectedSeriesKey, setSelectedSeriesKey] = useState('')
   const width = 640
   const height = 250
   const padding = { top: 18, right: 18, bottom: 34, left: 62 }
   const plotWidth = width - padding.left - padding.right
   const plotHeight = height - padding.top - padding.bottom
-  const values = series.flatMap((item) => trend.map((point) => item.value(point)))
+  const visibleSeries = selectedSeriesKey ? series.filter((item) => item.key === selectedSeriesKey) : series
+  const values = visibleSeries.flatMap((item) => trend.map((point) => item.value(point)))
   const maxValue = Math.max(1, ...values)
   const tickValues = Array.from({ length: 4 }, (_, index) => (maxValue * (3 - index)) / 3)
   const labelIndexes = getChartLabelIndexes(trend.length)
@@ -261,11 +264,17 @@ function TrendAreaChart({ trend, series, valueFormatter }) {
     <div className="area-chart">
       <div className="area-chart__legend">
         {series.map((item) => (
-          <span key={item.key}>
+          <button
+            className={`${filterable ? 'is-clickable' : ''} ${selectedSeriesKey === item.key ? 'active' : ''} ${selectedSeriesKey && selectedSeriesKey !== item.key ? 'muted' : ''}`}
+            disabled={!filterable}
+            key={item.key}
+            type="button"
+            onClick={() => setSelectedSeriesKey((current) => (current === item.key ? '' : item.key))}
+          >
             <i style={{ background: item.color }} />
             {item.label}
             <strong>{valueFormatter(item.value(trend[trend.length - 1]))}</strong>
-          </span>
+          </button>
         ))}
       </div>
       <svg
@@ -277,7 +286,7 @@ function TrendAreaChart({ trend, series, valueFormatter }) {
         onPointerLeave={() => setActiveIndex(null)}
       >
         <defs>
-          {series.map((item) => (
+          {visibleSeries.map((item) => (
             <linearGradient id={`chart-gradient-${item.key}`} key={item.key} x1="0" x2="0" y1="0" y2="1">
               <stop offset="0%" stopColor={item.color} stopOpacity="0.28" />
               <stop offset="100%" stopColor={item.color} stopOpacity="0.02" />
@@ -290,7 +299,7 @@ function TrendAreaChart({ trend, series, valueFormatter }) {
             <text className="area-chart__axis-label" x={padding.left - 10} y={y(value) + 4} textAnchor="end">{valueFormatter(value)}</text>
           </g>
         ))}
-        {series.map((item) => {
+        {visibleSeries.map((item) => {
           const points = trend.map((point, index) => [x(index), y(item.value(point))])
           const line = points.map(([pointX, pointY]) => `${pointX},${pointY}`).join(' ')
           const area = `${points[0][0]},${padding.top + plotHeight} ${line} ${points[points.length - 1][0]},${padding.top + plotHeight}`
@@ -321,7 +330,7 @@ function TrendAreaChart({ trend, series, valueFormatter }) {
           style={{ left: `${(x(activeIndex) / width) * 100}%` }}
         >
           <strong>{formatFullDate(activePoint.day)}</strong>
-          {series.map((item) => (
+          {visibleSeries.map((item) => (
             <span key={item.key}>
               <i style={{ background: item.color }} />
               {item.label}
@@ -350,6 +359,54 @@ function getTooltipAlignment(index, length) {
     return 'align-right'
   }
   return ''
+}
+
+function buildCompleteTrend(sourceTrend, period) {
+  const days = enumerateDays(period?.from, period?.to)
+  if (days.length === 0) {
+    return sourceTrend
+  }
+
+  const pointsByDay = new Map(sourceTrend.map((point) => [toText(point.day), point]))
+
+  return days.map((day) => ({
+    day,
+    demand_units: 0,
+    sold_units: 0,
+    revenue: '0',
+    gross_profit: '0',
+    marketplace_fee: '0',
+    net_profit: '0',
+    ...(pointsByDay.get(day) || {}),
+  }))
+}
+
+function enumerateDays(from, to) {
+  const fromDate = parseInputDate(from)
+  const toDate = parseInputDate(to)
+  if (!fromDate || !toDate || fromDate > toDate) {
+    return []
+  }
+
+  const days = []
+  const current = new Date(fromDate)
+  while (current <= toDate) {
+    days.push(formatISODate(current))
+    current.setUTCDate(current.getUTCDate() + 1)
+  }
+  return days
+}
+
+function parseInputDate(value) {
+  const match = toText(value).match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (!match) {
+    return null
+  }
+  return new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])))
+}
+
+function formatISODate(date) {
+  return date.toISOString().slice(0, 10)
 }
 
 function buildProductSalesSeries(productTrends, trend, orders) {
