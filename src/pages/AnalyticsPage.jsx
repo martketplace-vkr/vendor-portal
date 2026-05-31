@@ -25,6 +25,7 @@ export function AnalyticsPage({
   const highDemand = niches.slice().sort((left, right) => right.market_demand_units - left.market_demand_units).slice(0, 5)
   const lowDemand = niches.slice().sort((left, right) => left.market_demand_units - right.market_demand_units).slice(0, 5)
   const productSalesSeries = buildProductSalesSeries(analytics.overview?.product_trends ?? analytics.overview?.productTrends, trend, orders)
+  const revenueShare = buildProductRevenueShare(products)
   return (
     <div className="page-grid analytics-page">
       <section className="panel-card analytics-toolbar">
@@ -135,6 +136,17 @@ export function AnalyticsPage({
 
       <section className="panel-card">
         <div className="panel-head">
+          <h2>Структура выручки по товарам</h2>
+        </div>
+        {revenueShare.length === 0 ? (
+          <EmptyAnalytics message="Доли выручки появятся после продаж." />
+        ) : (
+          <DonutChart items={revenueShare} />
+        )}
+      </section>
+
+      <section className="panel-card">
+        <div className="panel-head">
           <h2>Ниши с высоким спросом и низким предложением</h2>
         </div>
         <AnalyticsTable
@@ -235,7 +247,7 @@ function EmptyAnalytics({ message }) {
   return <div className="empty-panel analytics-empty">{message}</div>
 }
 
-function TrendAreaChart({ trend, series, valueFormatter, filterable = false }) {
+function TrendAreaChart({ trend, series, valueFormatter, filterable = false, legendValue = 'total' }) {
   const [activeIndex, setActiveIndex] = useState(null)
   const [selectedSeriesKey, setSelectedSeriesKey] = useState('')
   const width = 640
@@ -273,7 +285,7 @@ function TrendAreaChart({ trend, series, valueFormatter, filterable = false }) {
           >
             <i style={{ background: item.color }} />
             {item.label}
-            <strong>{valueFormatter(item.value(trend[trend.length - 1]))}</strong>
+            <strong>{valueFormatter(getLegendValue(item, trend, legendValue))}</strong>
           </button>
         ))}
       </div>
@@ -341,6 +353,62 @@ function TrendAreaChart({ trend, series, valueFormatter, filterable = false }) {
       )}
     </div>
   )
+}
+
+function DonutChart({ items }) {
+  const size = 260
+  const center = size / 2
+  const radius = 96
+  const strokeWidth = 38
+  const circumference = 2 * Math.PI * radius
+  const slices = items.reduce((accumulator, item) => {
+    const dash = (item.percent / 100) * circumference
+    const offset = accumulator.offset + dash
+    return {
+      offset,
+      items: [...accumulator.items, { ...item, dash, offset: accumulator.offset }],
+    }
+  }, { offset: 0, items: [] }).items
+
+  return (
+    <div className="donut-chart">
+      <svg className="donut-chart__svg" viewBox={`0 0 ${size} ${size}`} role="img" aria-label="Структура выручки по товарам">
+        <circle className="donut-chart__track" cx={center} cy={center} r={radius} strokeWidth={strokeWidth} />
+        {slices.map((item) => (
+          <circle
+            className="donut-chart__slice"
+            cx={center}
+            cy={center}
+            key={item.key}
+            r={radius}
+            stroke={item.color}
+            strokeDasharray={`${item.dash} ${circumference - item.dash}`}
+            strokeDashoffset={-item.offset}
+            strokeWidth={strokeWidth}
+          />
+        ))}
+        <text className="donut-chart__total-label" x={center} y={center - 6} textAnchor="middle">Выручка</text>
+        <text className="donut-chart__total-value" x={center} y={center + 20} textAnchor="middle">{formatCompactPrice(items.reduce((sum, item) => sum + item.value, 0))}</text>
+      </svg>
+      <div className="donut-chart__legend">
+        {items.map((item) => (
+          <div className="donut-chart__legend-row" key={item.key}>
+            <i style={{ background: item.color }} />
+            <span>{item.label}</span>
+            <strong>{formatNumber(item.percent)}%</strong>
+            <b>{formatPrice(item.value)}</b>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function getLegendValue(item, trend, mode) {
+  if (mode === 'last') {
+    return item.value(trend[trend.length - 1])
+  }
+  return trend.reduce((sum, point) => sum + item.value(point), 0)
 }
 
 function getChartLabelIndexes(length) {
@@ -431,6 +499,33 @@ function buildProductSalesSeries(productTrends, trend, orders) {
       value: (point) => valuesByDay.get(point.day) || 0,
     }
   })
+}
+
+function buildProductRevenueShare(products) {
+  const colors = ['#2563eb', '#22a06b', '#f0a928', '#8b5cf6', '#e85d75', '#06a6b7']
+  const rows = products
+    .map((product) => ({
+      key: `revenue-${product.product_id ?? product.productId}`,
+      label: product.product_name ?? product.productName ?? `Товар ${product.product_id ?? product.productId}`,
+      value: parsePriceValue(product.revenue),
+    }))
+    .filter((item) => item.value > 0)
+    .sort((left, right) => right.value - left.value)
+
+  if (rows.length === 0) {
+    return []
+  }
+
+  const topRows = rows.slice(0, 5)
+  const otherValue = rows.slice(5).reduce((sum, item) => sum + item.value, 0)
+  const items = otherValue > 0 ? [...topRows, { key: 'revenue-other', label: 'Остальные товары', value: otherValue }] : topRows
+  const total = items.reduce((sum, item) => sum + item.value, 0)
+
+  return items.map((item, index) => ({
+    ...item,
+    color: colors[index % colors.length],
+    percent: total > 0 ? (item.value / total) * 100 : 0,
+  }))
 }
 
 function buildProductTrendsFromOrders(trend, orders) {
