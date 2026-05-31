@@ -781,6 +781,71 @@
   gap: 12px;
 }
 
+.area-chart {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.area-chart__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.area-chart__legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 10px;
+  border: 1px solid var(--line-soft);
+  border-radius: 999px;
+  background: #f8fbff;
+  color: var(--text-soft);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.area-chart__legend i {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+}
+
+.area-chart__legend strong {
+  color: var(--text-main);
+}
+
+.area-chart__svg {
+  display: block;
+  width: 100%;
+  min-height: 230px;
+  overflow: visible;
+}
+
+.area-chart__grid-line {
+  stroke: rgba(32, 67, 119, 0.12);
+  stroke-dasharray: 4 5;
+}
+
+.area-chart__axis-label {
+  fill: var(--text-soft);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.area-chart__line {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 4;
+}
+
+.area-chart__point {
+  stroke: #ffffff;
+  stroke-width: 3;
+}
+
 .trend-row {
   display: grid;
   grid-template-columns: 78px minmax(0, 1fr) 96px;

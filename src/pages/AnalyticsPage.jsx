@@ -22,9 +22,6 @@ export function AnalyticsPage({
   const lowMargin = products.filter((product) => product.has_cost).sort((left, right) => left.margin_percent - right.margin_percent).slice(0, 5)
   const highDemand = niches.slice().sort((left, right) => right.market_demand_units - left.market_demand_units).slice(0, 5)
   const lowDemand = niches.slice().sort((left, right) => left.market_demand_units - right.market_demand_units).slice(0, 5)
-  const maxTrendRevenue = Math.max(1, ...trend.map((point) => parsePriceValue(point.revenue)))
-  const maxTrendDemand = Math.max(1, ...trend.map((point) => Number(point.demand_units) || 0))
-
   return (
     <div className="page-grid analytics-page">
       <section className="panel-card analytics-toolbar">
@@ -83,16 +80,14 @@ export function AnalyticsPage({
             {trend.length === 0 ? (
               <EmptyAnalytics message="За период пока нет продаж." />
             ) : (
-              trend.map((point) => (
-                <div className="trend-row" key={point.day}>
-                  <span>{formatShortDate(point.day)}</span>
-                  <div className="trend-bars">
-                    <div className="trend-bar trend-bar-revenue" style={{ width: `${(parsePriceValue(point.revenue) / maxTrendRevenue) * 100}%` }} />
-                    <div className="trend-bar trend-bar-profit" style={{ width: `${(Math.max(0, parsePriceValue(point.gross_profit)) / maxTrendRevenue) * 100}%` }} />
-                  </div>
-                  <strong>{formatPrice(point.revenue)}</strong>
-                </div>
-              ))
+              <TrendAreaChart
+                series={[
+                  { key: 'revenue', label: 'Выручка', color: '#2563eb', value: (point) => parsePriceValue(point.revenue) },
+                  { key: 'profit', label: 'Прибыль', color: '#22a06b', value: (point) => Math.max(0, parsePriceValue(point.gross_profit)) },
+                ]}
+                trend={trend}
+                valueFormatter={formatCompactPrice}
+              />
             )}
           </div>
         </section>
@@ -105,15 +100,13 @@ export function AnalyticsPage({
             {trend.length === 0 ? (
               <EmptyAnalytics message="Спрос появится после заказов." />
             ) : (
-              trend.map((point) => (
-                <div className="trend-row" key={point.day}>
-                  <span>{formatShortDate(point.day)}</span>
-                  <div className="trend-bars">
-                    <div className="trend-bar trend-bar-demand" style={{ width: `${((Number(point.demand_units) || 0) / maxTrendDemand) * 100}%` }} />
-                  </div>
-                  <strong>{formatNumber(point.demand_units)}</strong>
-                </div>
-              ))
+              <TrendAreaChart
+                series={[
+                  { key: 'demand', label: 'Спрос', color: '#f0a928', value: (point) => Number(point.demand_units) || 0 },
+                ]}
+                trend={trend}
+                valueFormatter={formatNumber}
+              />
             )}
           </div>
         </section>
@@ -221,6 +214,78 @@ function EmptyAnalytics({ message }) {
   return <div className="empty-panel analytics-empty">{message}</div>
 }
 
+function TrendAreaChart({ trend, series, valueFormatter }) {
+  const width = 640
+  const height = 250
+  const padding = { top: 18, right: 18, bottom: 34, left: 62 }
+  const plotWidth = width - padding.left - padding.right
+  const plotHeight = height - padding.top - padding.bottom
+  const values = series.flatMap((item) => trend.map((point) => item.value(point)))
+  const maxValue = Math.max(1, ...values)
+  const tickValues = Array.from({ length: 4 }, (_, index) => (maxValue * (3 - index)) / 3)
+  const labelIndexes = getChartLabelIndexes(trend.length)
+  const x = (index) => padding.left + (trend.length === 1 ? plotWidth / 2 : (index / (trend.length - 1)) * plotWidth)
+  const y = (value) => padding.top + plotHeight - (value / maxValue) * plotHeight
+
+  return (
+    <div className="area-chart">
+      <div className="area-chart__legend">
+        {series.map((item) => (
+          <span key={item.key}>
+            <i style={{ background: item.color }} />
+            {item.label}
+            <strong>{valueFormatter(item.value(trend[trend.length - 1]))}</strong>
+          </span>
+        ))}
+      </div>
+      <svg className="area-chart__svg" viewBox={`0 0 ${width} ${height}`} role="img" aria-label={series.map((item) => item.label).join(' и ')}>
+        <defs>
+          {series.map((item) => (
+            <linearGradient id={`chart-gradient-${item.key}`} key={item.key} x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0%" stopColor={item.color} stopOpacity="0.28" />
+              <stop offset="100%" stopColor={item.color} stopOpacity="0.02" />
+            </linearGradient>
+          ))}
+        </defs>
+        {tickValues.map((value) => (
+          <g key={value}>
+            <line className="area-chart__grid-line" x1={padding.left} x2={width - padding.right} y1={y(value)} y2={y(value)} />
+            <text className="area-chart__axis-label" x={padding.left - 10} y={y(value) + 4} textAnchor="end">{valueFormatter(value)}</text>
+          </g>
+        ))}
+        {series.map((item) => {
+          const points = trend.map((point, index) => [x(index), y(item.value(point))])
+          const line = points.map(([pointX, pointY]) => `${pointX},${pointY}`).join(' ')
+          const area = `${points[0][0]},${padding.top + plotHeight} ${line} ${points[points.length - 1][0]},${padding.top + plotHeight}`
+
+          return (
+            <g key={item.key}>
+              <polygon fill={`url(#chart-gradient-${item.key})`} points={area} />
+              <polyline className="area-chart__line" points={line} style={{ stroke: item.color }} />
+              {points.map(([pointX, pointY], index) => (
+                <circle className="area-chart__point" cx={pointX} cy={pointY} fill={item.color} key={`${item.key}-${trend[index].day}`} r="4" />
+              ))}
+            </g>
+          )
+        })}
+        {labelIndexes.map((index) => (
+          <text className="area-chart__axis-label" key={trend[index].day} x={x(index)} y={height - 8} textAnchor="middle">
+            {formatShortDate(trend[index].day)}
+          </text>
+        ))}
+      </svg>
+    </div>
+  )
+}
+
+function getChartLabelIndexes(length) {
+  if (length <= 4) {
+    return Array.from({ length }, (_, index) => index)
+  }
+
+  return [...new Set([0, Math.round((length - 1) / 3), Math.round(((length - 1) * 2) / 3), length - 1])]
+}
+
 function productRow(product) {
   return [
     product.product_name || `Товар ${product.product_id}`,
@@ -244,6 +309,17 @@ function formatNumber(value) {
 
 function formatPercent(value) {
   return `${formatNumber(value)}%`
+}
+
+function formatCompactPrice(value) {
+  const number = Number(value) || 0
+  if (number >= 1000000) {
+    return `${formatNumber(number / 1000000)} млн ₽`
+  }
+  if (number >= 1000) {
+    return `${formatNumber(number / 1000)} тыс. ₽`
+  }
+  return `${formatNumber(number)} ₽`
 }
 
 function formatShortDate(value) {
