@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { formatPrice, parsePriceValue, toText } from '../helpers'
 
 const PERIODS = [
@@ -110,6 +111,25 @@ export function AnalyticsPage({
             )}
           </div>
         </section>
+
+        <section className="panel-card analytics-sales-chart">
+          <div className="panel-head">
+            <h2>Продажи товаров</h2>
+          </div>
+          <div className="trend-chart">
+            {trend.length === 0 ? (
+              <EmptyAnalytics message="Продажи появятся после успешных заказов." />
+            ) : (
+              <TrendAreaChart
+                series={[
+                  { key: 'sold', label: 'Продано товаров', color: '#8b5cf6', value: (point) => Number(point.sold_units) || 0 },
+                ]}
+                trend={trend}
+                valueFormatter={formatUnits}
+              />
+            )}
+          </div>
+        </section>
       </div>
 
       <section className="panel-card">
@@ -215,6 +235,7 @@ function EmptyAnalytics({ message }) {
 }
 
 function TrendAreaChart({ trend, series, valueFormatter }) {
+  const [activeIndex, setActiveIndex] = useState(null)
   const width = 640
   const height = 250
   const padding = { top: 18, right: 18, bottom: 34, left: 62 }
@@ -226,6 +247,15 @@ function TrendAreaChart({ trend, series, valueFormatter }) {
   const labelIndexes = getChartLabelIndexes(trend.length)
   const x = (index) => padding.left + (trend.length === 1 ? plotWidth / 2 : (index / (trend.length - 1)) * plotWidth)
   const y = (value) => padding.top + plotHeight - (value / maxValue) * plotHeight
+  const activePoint = activeIndex === null ? null : trend[activeIndex]
+
+  function handlePointerMove(event) {
+    const bounds = event.currentTarget.getBoundingClientRect()
+    const pointerX = ((event.clientX - bounds.left) / bounds.width) * width
+    const relativeX = Math.max(0, Math.min(plotWidth, pointerX - padding.left))
+    const index = trend.length === 1 ? 0 : Math.round((relativeX / plotWidth) * (trend.length - 1))
+    setActiveIndex(index)
+  }
 
   return (
     <div className="area-chart">
@@ -238,7 +268,14 @@ function TrendAreaChart({ trend, series, valueFormatter }) {
           </span>
         ))}
       </div>
-      <svg className="area-chart__svg" viewBox={`0 0 ${width} ${height}`} role="img" aria-label={series.map((item) => item.label).join(' и ')}>
+      <svg
+        className="area-chart__svg"
+        viewBox={`0 0 ${width} ${height}`}
+        role="img"
+        aria-label={series.map((item) => item.label).join(' и ')}
+        onPointerMove={handlePointerMove}
+        onPointerLeave={() => setActiveIndex(null)}
+      >
         <defs>
           {series.map((item) => (
             <linearGradient id={`chart-gradient-${item.key}`} key={item.key} x1="0" x2="0" y1="0" y2="1">
@@ -263,17 +300,36 @@ function TrendAreaChart({ trend, series, valueFormatter }) {
               <polygon fill={`url(#chart-gradient-${item.key})`} points={area} />
               <polyline className="area-chart__line" points={line} style={{ stroke: item.color }} />
               {points.map(([pointX, pointY], index) => (
-                <circle className="area-chart__point" cx={pointX} cy={pointY} fill={item.color} key={`${item.key}-${trend[index].day}`} r="4" />
+                <circle className={`area-chart__point ${activeIndex === index ? 'active' : ''}`} cx={pointX} cy={pointY} fill={item.color} key={`${item.key}-${trend[index].day}`} r={activeIndex === index ? 6 : 4} />
               ))}
             </g>
           )
         })}
+        {activePoint && (
+          <line className="area-chart__hover-line" x1={x(activeIndex)} x2={x(activeIndex)} y1={padding.top} y2={padding.top + plotHeight} />
+        )}
         {labelIndexes.map((index) => (
           <text className="area-chart__axis-label" key={trend[index].day} x={x(index)} y={height - 8} textAnchor="middle">
             {formatShortDate(trend[index].day)}
           </text>
         ))}
+        <rect className="area-chart__hit-area" x={padding.left} y={padding.top} width={plotWidth} height={plotHeight} />
       </svg>
+      {activePoint && (
+        <div
+          className={`area-chart__tooltip ${getTooltipAlignment(activeIndex, trend.length)}`}
+          style={{ left: `${(x(activeIndex) / width) * 100}%` }}
+        >
+          <strong>{formatFullDate(activePoint.day)}</strong>
+          {series.map((item) => (
+            <span key={item.key}>
+              <i style={{ background: item.color }} />
+              {item.label}
+              <b>{valueFormatter(item.value(activePoint))}</b>
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -284,6 +340,16 @@ function getChartLabelIndexes(length) {
   }
 
   return [...new Set([0, Math.round((length - 1) / 3), Math.round(((length - 1) * 2) / 3), length - 1])]
+}
+
+function getTooltipAlignment(index, length) {
+  if (index === 0) {
+    return 'align-left'
+  }
+  if (index === length - 1) {
+    return 'align-right'
+  }
+  return ''
 }
 
 function productRow(product) {
@@ -311,6 +377,10 @@ function formatPercent(value) {
   return `${formatNumber(value)}%`
 }
 
+function formatUnits(value) {
+  return `${formatNumber(value)} шт.`
+}
+
 function formatCompactPrice(value) {
   const number = Number(value) || 0
   if (number >= 1000000) {
@@ -328,4 +398,12 @@ function formatShortDate(value) {
     return toText(value)
   }
   return new Intl.DateTimeFormat('ru-RU', { day: '2-digit', month: 'short' }).format(date)
+}
+
+function formatFullDate(value) {
+  const date = new Date(toText(value))
+  if (Number.isNaN(date.getTime())) {
+    return toText(value)
+  }
+  return new Intl.DateTimeFormat('ru-RU', { day: '2-digit', month: 'long', year: 'numeric' }).format(date)
 }
