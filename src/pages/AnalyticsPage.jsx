@@ -9,6 +9,7 @@ const PERIODS = [
 
 export function AnalyticsPage({
   analytics,
+  orders = [],
   period,
   busyKeys,
   onPeriodPreset,
@@ -23,6 +24,7 @@ export function AnalyticsPage({
   const lowMargin = products.filter((product) => product.has_cost).sort((left, right) => left.margin_percent - right.margin_percent).slice(0, 5)
   const highDemand = niches.slice().sort((left, right) => right.market_demand_units - left.market_demand_units).slice(0, 5)
   const lowDemand = niches.slice().sort((left, right) => left.market_demand_units - right.market_demand_units).slice(0, 5)
+  const productSalesSeries = buildProductSalesSeries(analytics.overview?.product_trends ?? analytics.overview?.productTrends, trend, orders)
   return (
     <div className="page-grid analytics-page">
       <section className="panel-card analytics-toolbar">
@@ -117,13 +119,11 @@ export function AnalyticsPage({
             <h2>Продажи товаров</h2>
           </div>
           <div className="trend-chart">
-            {trend.length === 0 ? (
+            {trend.length === 0 || productSalesSeries.length === 0 ? (
               <EmptyAnalytics message="Продажи появятся после успешных заказов." />
             ) : (
               <TrendAreaChart
-                series={[
-                  { key: 'sold', label: 'Продано товаров', color: '#8b5cf6', value: (point) => Number(point.sold_units) || 0 },
-                ]}
+                series={productSalesSeries}
                 trend={trend}
                 valueFormatter={formatUnits}
               />
@@ -297,7 +297,7 @@ function TrendAreaChart({ trend, series, valueFormatter }) {
 
           return (
             <g key={item.key}>
-              <polygon fill={`url(#chart-gradient-${item.key})`} points={area} />
+              {item.showArea !== false && <polygon fill={`url(#chart-gradient-${item.key})`} points={area} />}
               <polyline className="area-chart__line" points={line} style={{ stroke: item.color }} />
               {points.map(([pointX, pointY], index) => (
                 <circle className={`area-chart__point ${activeIndex === index ? 'active' : ''}`} cx={pointX} cy={pointY} fill={item.color} key={`${item.key}-${trend[index].day}`} r={activeIndex === index ? 6 : 4} />
@@ -350,6 +350,91 @@ function getTooltipAlignment(index, length) {
     return 'align-right'
   }
   return ''
+}
+
+function buildProductSalesSeries(productTrends, trend, orders) {
+  const colors = ['#8b5cf6', '#2563eb', '#22a06b', '#f0a928', '#e85d75', '#06a6b7', '#f97316', '#64748b']
+  const normalizedTrends = Array.isArray(productTrends) && productTrends.length > 0
+    ? productTrends
+    : buildProductTrendsFromOrders(trend, orders)
+
+  if (normalizedTrends.length === 0) {
+    return []
+  }
+
+  return normalizedTrends.map((product, index) => {
+    const valuesByDay = new Map((product.points || []).map((point) => [point.day, Number(point.sold_units ?? point.soldUnits) || 0]))
+    const productId = product.product_id ?? product.productId
+
+    return {
+      key: `product-${productId}`,
+      label: product.product_name ?? product.productName ?? `Товар ${productId}`,
+      color: colors[index % colors.length],
+      showArea: false,
+      value: (point) => valuesByDay.get(point.day) || 0,
+    }
+  })
+}
+
+function buildProductTrendsFromOrders(trend, orders) {
+  if (!Array.isArray(orders) || orders.length === 0) {
+    return []
+  }
+
+  const trendDays = new Set(trend.map((point) => point.day))
+  const productMap = new Map()
+
+  for (const order of orders) {
+    if (normalizeOrderStatus(order?.fulfillmentStatus ?? order?.fulfillment_status ?? order?.status) !== 'success') {
+      continue
+    }
+
+    const day = getOrderDay(order)
+    if (!trendDays.has(day)) {
+      continue
+    }
+
+    const product = order?.product || {}
+    const productId = toText(product.product_id ?? product.productId ?? order.product_id ?? order.productId)
+    if (!productId) {
+      continue
+    }
+
+    const productName = toText(product.product_name ?? product.productName ?? order.product_name ?? order.productName) || `Товар ${productId}`
+    const quantity = Number(order.quantity) || 1
+
+    if (!productMap.has(productId)) {
+      productMap.set(productId, {
+        product_id: productId,
+        product_name: productName,
+        pointsByDay: new Map(),
+      })
+    }
+
+    const item = productMap.get(productId)
+    item.pointsByDay.set(day, (item.pointsByDay.get(day) || 0) + quantity)
+  }
+
+  return [...productMap.values()].map((product) => ({
+    product_id: product.product_id,
+    product_name: product.product_name,
+    points: trend.map((point) => ({
+      day: point.day,
+      sold_units: product.pointsByDay.get(point.day) || 0,
+    })),
+  }))
+}
+
+function getOrderDay(order) {
+  const date = new Date(toText(order?.createdAt ?? order?.created_at))
+  if (Number.isNaN(date.getTime())) {
+    return ''
+  }
+  return date.toISOString().slice(0, 10)
+}
+
+function normalizeOrderStatus(status) {
+  return toText(status).trim().toLowerCase().replace(/^[a-z_]+_status_/, '').replace(/[^a-z0-9_]+/g, '_')
 }
 
 function productRow(product) {

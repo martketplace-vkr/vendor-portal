@@ -1059,6 +1059,7 @@ export function useVendorPortalController() {
       },
       analytics: {
         analytics,
+        orders,
         period: analyticsPeriod,
         busyKeys,
         onPeriodPreset: setAnalyticsPeriodPreset,
