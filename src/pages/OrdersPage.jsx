@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { formatDateTime, formatPrice, shortText, toText } from '../helpers'
+import { formatDateTime, formatPrice, formatUSDTPrice, shortText, toText } from '../helpers'
 
 const ORDER_STATUS_OPTIONS = [
   { value: 'created', label: 'Создан' },
@@ -81,7 +81,7 @@ export function OrdersPage({ orders, busyKeys, onReloadOrders, onUpdateOrderStat
         </article>
         <article className="metric-card metric-card-accent">
           <span className="metric-card__label">Выручка</span>
-          <strong className="metric-card__value">{formatPrice(orderStats.revenue)}</strong>
+          <strong className="metric-card__value">{formatRevenue(orderStats.revenueByCurrency)}</strong>
         </article>
       </section>
 
@@ -168,7 +168,7 @@ export function OrdersPage({ orders, busyKeys, onReloadOrders, onUpdateOrderStat
                     </div>
                     <div>
                       <span>Сумма</span>
-                      <strong>{formatPrice(getOrderTotal(order))}</strong>
+                      <strong>{formatOrderMoney(getOrderTotal(order), order)}</strong>
                     </div>
                   </div>
 
@@ -258,11 +258,20 @@ function buildOrderStats(orders) {
       if (STATUS_GROUPS.work.has(status) || STATUS_GROUPS.delivery.has(status)) {
         accumulator.inProgress += 1
       }
-      accumulator.revenue += parseMoneyAmount(getOrderTotal(order))
+      const currencyId = getOrderCurrencyId(order)
+      accumulator.revenueByCurrency[currencyId] = (accumulator.revenueByCurrency[currencyId] || 0) + parseMoneyAmount(getOrderTotal(order))
       return accumulator
     },
-    { inProgress: 0, revenue: 0 },
+    { inProgress: 0, revenueByCurrency: {} },
   )
+}
+
+function formatRevenue(revenueByCurrency) {
+  const totals = Object.entries(revenueByCurrency || {})
+    .filter(([, total]) => total > 0)
+    .map(([currencyId, total]) => formatOrderMoney(total, currencyId))
+
+  return totals.length > 0 ? totals.join(' + ') : formatPrice(0)
 }
 
 function getNextStatuses(status) {
@@ -311,6 +320,10 @@ function getOrderTotal(order) {
   return toText(order?.totalPrice ?? order?.total_price)
 }
 
+function getOrderCurrencyId(order) {
+  return toText(order?.currencyId ?? order?.currency_id ?? order?.payment?.currencyId ?? order?.payment?.currency_id) || '1000'
+}
+
 function getOrderCreatedAt(order) {
   return order?.createdAt ?? order?.created_at ?? ''
 }
@@ -320,7 +333,15 @@ function getOrderUpdatedAt(order) {
 }
 
 function getOrderMeta(order) {
-  return `${getOrderQuantity(order)} шт. x ${formatPrice(getOrderUnitPrice(order))}`
+  return `${getOrderQuantity(order)} шт. x ${formatOrderMoney(getOrderUnitPrice(order), order)}`
+}
+
+function formatOrderMoney(value, orderOrCurrencyId) {
+  const currencyId = typeof orderOrCurrencyId === 'string' || typeof orderOrCurrencyId === 'number'
+    ? toText(orderOrCurrencyId)
+    : getOrderCurrencyId(orderOrCurrencyId)
+
+  return currencyId === '2001' ? formatUSDTPrice(value) : formatPrice(value)
 }
 
 function getOrderStatusLabel(status) {
