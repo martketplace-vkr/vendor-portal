@@ -191,6 +191,46 @@ export function ProductEditor({
         </div>
 
         <div className="field">
+          <label className="checkbox-row">
+            <input
+              type="checkbox"
+              checked={Boolean(form.acceptsCrypto)}
+              onChange={(event) =>
+                onChange((current) => ({
+                  ...current,
+                  acceptsCrypto: event.target.checked,
+                  cryptoPricingMode: event.target.checked ? 'rub_rate' : 'disabled',
+                  cryptoPriceUsdt: event.target.checked ? current.cryptoPriceUsdt : '',
+                }))
+              }
+            />
+            <span>Принимать оплату в USDT TRC-20</span>
+          </label>
+
+          {form.acceptsCrypto ? (
+            <div className="form-split">
+              <Field
+                label="Цена в USDT"
+                as="select"
+                value={form.cryptoPricingMode}
+                onChange={(event) => onChange((current) => ({ ...current, cryptoPricingMode: event.target.value }))}
+              >
+                <option value="rub_rate">Пересчитывать из рублей по курсу платформы</option>
+                <option value="fixed_usdt">Фиксированная цена в USDT</option>
+              </Field>
+              {form.cryptoPricingMode === 'fixed_usdt' ? (
+                <Field
+                  label="Фиксированная цена, USDT"
+                  value={form.cryptoPriceUsdt}
+                  onChange={(event) => onChange((current) => ({ ...current, cryptoPriceUsdt: event.target.value }))}
+                  placeholder="99.90"
+                />
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+
+        <div className="field">
           <div className="attribute-editor__head">
             <span className="field-label">Атрибуты</span>
             <button className="button button-secondary attribute-editor__add" type="button" onClick={addSection}>

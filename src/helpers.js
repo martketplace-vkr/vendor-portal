@@ -12,6 +12,9 @@ export const emptyProductForm = {
   name: '',
   description: '',
   price: '',
+  acceptsCrypto: false,
+  cryptoPricingMode: 'disabled',
+  cryptoPriceUsdt: '',
   costPrice: '',
   stockCount: '',
   attributes: [],
@@ -227,9 +230,16 @@ export function buildProductPayload(form, options = {}) {
     name: normalizedName,
     description: toText(form.description).trim(),
     price: normalizedPrice,
+    accepts_crypto: Boolean(form.acceptsCrypto),
+    crypto_pricing_mode: form.acceptsCrypto ? toText(form.cryptoPricingMode).trim() : 'disabled',
+    crypto_price_usdt: form.acceptsCrypto && form.cryptoPricingMode === 'fixed_usdt' ? normalizeUSDTPrice(form.cryptoPriceUsdt) : '',
     stock_count: parseNonNegativeInteger(form.stockCount, 'Stock count'),
     attributes: buildAttributeSectionsPayload(form.attributes),
     images: parseProductImages(form.images),
+  }
+
+  if (payload.accepts_crypto && payload.crypto_pricing_mode === 'fixed_usdt' && !payload.crypto_price_usdt) {
+    throw new Error('Укажите фиксированную цену в USDT.')
   }
 
   if (includeVendorId) {
@@ -246,6 +256,9 @@ export function populateProductForm(product) {
     name: getProductName(product),
     description: getProductDescription(product),
     price: getProductPrice(product),
+    acceptsCrypto: Boolean(product?.acceptsCrypto ?? product?.accepts_crypto),
+    cryptoPricingMode: toText(product?.cryptoPricingMode ?? product?.crypto_pricing_mode) || 'disabled',
+    cryptoPriceUsdt: toText(product?.cryptoPriceUsdt ?? product?.crypto_price_usdt),
     costPrice: toText(product?.costPrice ?? product?.cost_price),
     stockCount: getStockCount(product),
     attributes: normalizeProductAttributes(product),
@@ -402,6 +415,21 @@ function normalizePrice(value) {
   }
 
   return ''
+}
+
+function normalizeUSDTPrice(value) {
+  const raw = toText(value).trim()
+  if (!raw) {
+    return ''
+  }
+
+  const normalized = raw.replace(/\s+/g, '').replace(',', '.')
+  const parsed = Number.parseFloat(normalized)
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    throw new Error('Укажите корректную цену в USDT.')
+  }
+
+  return parsed.toFixed(8).replace(/\.?0+$/, '')
 }
 
 function formatDecimal(value) {

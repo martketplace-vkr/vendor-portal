@@ -1667,6 +1667,13 @@
   gap: 12px;
 }
 
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+}
+
 .attribute-editor,
 .characteristic-sections,
 .image-upload-list {
