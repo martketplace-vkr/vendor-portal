@@ -345,7 +345,7 @@ function TrendAreaChart({ trend, series, valueFormatter, filterable = false, leg
           {visibleSeries.map((item) => (
             <span key={item.key}>
               <i style={{ background: item.color }} />
-              {item.label}
+              <em>{item.label}</em>
               <b>{valueFormatter(item.value(activePoint))}</b>
             </span>
           ))}
