@@ -28,6 +28,7 @@ export function AnalyticsPage({
   const productSalesSeries = buildProductSalesSeries(productTrends, trend, orders)
   const productViewsSeries = buildProductViewsSeries(productTrends)
   const revenueShare = buildProductRevenueShare(products)
+  const productViewRows = buildProductViewRows(products)
   return (
     <div className="page-grid analytics-page">
       <section className="panel-card analytics-toolbar">
@@ -187,6 +188,17 @@ export function AnalyticsPage({
 
       <section className="panel-card">
         <div className="panel-head">
+          <h2>Просмотры по товарам</h2>
+        </div>
+        <AnalyticsTable
+          empty="Просмотры по товарам появятся после открытий карточек."
+          columns={['Товар', 'Просмотры', 'Доля просмотров', 'Продано', 'Конверсия']}
+          rows={productViewRows}
+        />
+      </section>
+
+      <section className="panel-card">
+        <div className="panel-head">
           <h2>Ниши с высоким спросом и низким предложением</h2>
         </div>
         <AnalyticsTable
@@ -217,7 +229,7 @@ export function AnalyticsPage({
         </div>
         <AnalyticsTable
           empty="Добавьте себестоимость в карточках товаров, чтобы видеть прибыль и маржу."
-          columns={['Товар', 'Категория', 'Продано', 'Выручка', 'Себестоимость', 'Прибыль', 'Маржа', 'Остаток']}
+          columns={['Товар', 'Категория', 'Просмотры', 'Продано', 'Выручка', 'Себестоимость', 'Прибыль', 'Маржа', 'Остаток']}
           rows={products.map((product) => [
             product.product_name || `Товар ${product.product_id}`,
             product.category_name,
@@ -566,6 +578,27 @@ function buildProductViewsSeries(productTrends) {
       }
     })
     .filter((item) => item.total > 0)
+}
+
+function buildProductViewRows(products) {
+  const rows = products
+    .map((product) => ({
+      name: product.product_name ?? product.productName ?? `Товар ${product.product_id ?? product.productId}`,
+      views: Number(product.views_count ?? product.viewsCount) || 0,
+      soldUnits: Number(product.sold_units ?? product.soldUnits) || 0,
+    }))
+    .filter((product) => product.views > 0)
+    .sort((left, right) => right.views - left.views)
+
+  const totalViews = rows.reduce((sum, product) => sum + product.views, 0)
+
+  return rows.map((product) => [
+    product.name,
+    formatNumber(product.views),
+    formatPercent((product.views / totalViews) * 100),
+    formatNumber(product.soldUnits),
+    formatPercent((product.soldUnits / product.views) * 100),
+  ])
 }
 
 function buildProductRevenueShare(products) {

@@ -2851,3 +2851,166 @@
   background: rgba(220, 38, 38, 0.1);
   color: #991b1b;
 }
+
+/* Analytics is a working surface: keep the overview dense and scannable. */
+.analytics-page {
+  gap: 12px;
+}
+
+.analytics-page .panel-card {
+  padding: 14px;
+  border-radius: 8px;
+  box-shadow: 0 8px 20px rgba(22, 43, 85, 0.07);
+}
+
+.analytics-page .panel-head {
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.analytics-page .panel-head h2 {
+  font-size: 1rem;
+  line-height: 1.2;
+}
+
+.analytics-page .analytics-toolbar {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) auto;
+  gap: 12px;
+  padding: 12px 14px;
+}
+
+.analytics-page .analytics-toolbar h2 {
+  font-size: 1.05rem;
+}
+
+.analytics-page .analytics-toolbar p {
+  margin-top: 3px;
+  font-size: 0.78rem;
+}
+
+.analytics-page .analytics-toolbar__controls {
+  gap: 6px;
+}
+
+.analytics-page .segmented-control {
+  gap: 2px;
+  padding: 3px;
+}
+
+.analytics-page .segmented-control button {
+  min-height: 30px;
+  padding: 0 10px;
+  font-size: 0.76rem;
+}
+
+.analytics-page .date-field {
+  gap: 5px;
+  min-height: 36px;
+  padding: 0 9px;
+  font-size: 0.76rem;
+}
+
+.analytics-page .analytics-toolbar .button {
+  padding: 9px 12px;
+  font-size: 0.76rem;
+}
+
+.analytics-page .analytics-kpi-grid {
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.analytics-page .metric-card {
+  align-content: space-between;
+  min-height: 78px;
+  gap: 5px;
+  padding: 10px;
+}
+
+.analytics-page .metric-card__label {
+  font-size: 0.72rem;
+  line-height: 1.15;
+}
+
+.analytics-page .metric-card__value {
+  font-size: 1.35rem;
+  line-height: 1;
+}
+
+.analytics-page .analytics-grid-two {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.analytics-page .trend-chart,
+.analytics-page .area-chart {
+  gap: 8px;
+}
+
+.analytics-page .area-chart__legend {
+  gap: 6px;
+}
+
+.analytics-page .area-chart__legend button {
+  gap: 5px;
+  padding: 4px 7px;
+  font-size: 0.7rem;
+}
+
+.analytics-page .area-chart__legend i {
+  width: 7px;
+  height: 7px;
+}
+
+.analytics-page .area-chart__svg {
+  height: auto;
+  min-height: 0;
+  max-height: 176px;
+}
+
+.analytics-page .analytics-sales-chart .area-chart__svg {
+  max-height: 210px;
+}
+
+.analytics-page .area-chart__line {
+  stroke-width: 3;
+}
+
+.analytics-page .area-chart__point {
+  stroke-width: 2;
+}
+
+.analytics-page .analytics-empty {
+  min-height: 120px;
+}
+
+@media (min-width: 901px) and (max-width: 1240px) {
+  .analytics-page .analytics-toolbar {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .analytics-page .analytics-kpi-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .analytics-page .analytics-grid-two {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .analytics-page .analytics-toolbar {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .analytics-page .analytics-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .analytics-page .analytics-grid-two {
+    grid-template-columns: 1fr;
+  }
+}
