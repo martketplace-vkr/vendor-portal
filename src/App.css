@@ -780,6 +780,16 @@
   grid-column: 1 / -1;
 }
 
+.analytics-product-chart-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.analytics-product-chart-grid .analytics-sales-chart {
+  grid-column: auto;
+}
+
 .trend-chart {
   display: grid;
   gap: 12px;
@@ -2943,6 +2953,10 @@
   gap: 12px;
 }
 
+.analytics-page .analytics-product-chart-grid {
+  gap: 12px;
+}
+
 .analytics-page .trend-chart,
 .analytics-page .area-chart {
   gap: 8px;
@@ -3011,6 +3025,10 @@
   }
 
   .analytics-page .analytics-grid-two {
+    grid-template-columns: 1fr;
+  }
+
+  .analytics-page .analytics-product-chart-grid {
     grid-template-columns: 1fr;
   }
 }

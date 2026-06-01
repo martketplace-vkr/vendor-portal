@@ -137,7 +137,9 @@ export function AnalyticsPage({
             )}
           </div>
         </section>
+      </div>
 
+      <div className="analytics-product-chart-grid">
         <section className="panel-card analytics-sales-chart">
           <div className="panel-head">
             <h2>Продажи товаров</h2>
