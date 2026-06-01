@@ -24,7 +24,9 @@ export function AnalyticsPage({
   const lowMargin = products.filter((product) => product.has_cost).sort((left, right) => left.margin_percent - right.margin_percent).slice(0, 5)
   const highDemand = niches.slice().sort((left, right) => right.market_demand_units - left.market_demand_units).slice(0, 5)
   const lowDemand = niches.slice().sort((left, right) => left.market_demand_units - right.market_demand_units).slice(0, 5)
-  const productSalesSeries = buildProductSalesSeries(analytics.overview?.product_trends ?? analytics.overview?.productTrends, trend, orders)
+  const productTrends = analytics.overview?.product_trends ?? analytics.overview?.productTrends
+  const productSalesSeries = buildProductSalesSeries(productTrends, trend, orders)
+  const productViewsSeries = buildProductViewsSeries(productTrends)
   const revenueShare = buildProductRevenueShare(products)
   return (
     <div className="page-grid analytics-page">
@@ -67,6 +69,7 @@ export function AnalyticsPage({
       </section>
 
       <section className="analytics-kpi-grid">
+        <Metric label="Просмотры" value={formatNumber(kpi.product_views ?? kpi.productViews)} hint="открытия карточек" />
         <Metric label="Спрос" value={formatNumber(kpi.demand_units)} hint="неотмененные товары" />
         <Metric label="Продано" value={formatNumber(kpi.sold_units)} hint="успешные заказы" />
         <Metric label="Выручка" value={formatPrice(kpi.revenue)} hint="по успешным заказам" />
@@ -115,6 +118,25 @@ export function AnalyticsPage({
           </div>
         </section>
 
+        <section className="panel-card">
+          <div className="panel-head">
+            <h2>Динамика просмотров</h2>
+          </div>
+          <div className="trend-chart">
+            {trend.length === 0 ? (
+              <EmptyAnalytics message="Просмотры появятся после открытий карточек товаров." />
+            ) : (
+              <TrendAreaChart
+                series={[
+                  { key: 'views', label: 'Просмотры', color: '#06a6b7', value: (point) => Number(point.product_views ?? point.productViews) || 0 },
+                ]}
+                trend={trend}
+                valueFormatter={formatNumber}
+              />
+            )}
+          </div>
+        </section>
+
         <section className="panel-card analytics-sales-chart">
           <div className="panel-head">
             <h2>Продажи товаров</h2>
@@ -127,6 +149,24 @@ export function AnalyticsPage({
                 series={productSalesSeries}
                 trend={trend}
                 valueFormatter={formatUnits}
+                filterable
+              />
+            )}
+          </div>
+        </section>
+
+        <section className="panel-card analytics-sales-chart">
+          <div className="panel-head">
+            <h2>Просмотры товаров</h2>
+          </div>
+          <div className="trend-chart">
+            {trend.length === 0 || productViewsSeries.length === 0 ? (
+              <EmptyAnalytics message="Просмотры товаров появятся после открытий карточек." />
+            ) : (
+              <TrendAreaChart
+                series={productViewsSeries}
+                trend={trend}
+                valueFormatter={formatNumber}
                 filterable
               />
             )}
@@ -181,6 +221,7 @@ export function AnalyticsPage({
           rows={products.map((product) => [
             product.product_name || `Товар ${product.product_id}`,
             product.category_name,
+            formatNumber(product.views_count ?? product.viewsCount),
             formatNumber(product.sold_units),
             formatPrice(product.revenue),
             product.has_cost ? formatPrice(product.cost_price) : 'Не указана',
@@ -219,12 +260,14 @@ function AnalyticsTable({ columns, rows, empty }) {
     return <EmptyAnalytics message={empty} />
   }
 
+  const resolvedColumns = rows[0]?.length === columns.length + 1 ? [...columns.slice(0, 2), 'Просмотры', ...columns.slice(2)] : columns
+
   return (
     <div className="analytics-table-wrap">
       <table className="analytics-table">
         <thead>
           <tr>
-            {columns.map((column) => (
+            {resolvedColumns.map((column) => (
               <th key={column}>{column}</th>
             ))}
           </tr>
@@ -499,6 +542,30 @@ function buildProductSalesSeries(productTrends, trend, orders) {
       value: (point) => valuesByDay.get(point.day) || 0,
     }
   })
+}
+
+function buildProductViewsSeries(productTrends) {
+  const colors = ['#06a6b7', '#8b5cf6', '#2563eb', '#22a06b', '#f0a928', '#e85d75', '#f97316', '#64748b']
+  if (!Array.isArray(productTrends) || productTrends.length === 0) {
+    return []
+  }
+
+  return productTrends
+    .map((product, index) => {
+      const valuesByDay = new Map((product.points || []).map((point) => [point.day, Number(point.views_count ?? point.viewsCount) || 0]))
+      const total = [...valuesByDay.values()].reduce((sum, value) => sum + value, 0)
+      const productId = product.product_id ?? product.productId
+
+      return {
+        key: `product-views-${productId}`,
+        label: product.product_name ?? product.productName ?? `Товар ${productId}`,
+        color: colors[index % colors.length],
+        showArea: false,
+        total,
+        value: (point) => valuesByDay.get(point.day) || 0,
+      }
+    })
+    .filter((item) => item.total > 0)
 }
 
 function buildProductRevenueShare(products) {
