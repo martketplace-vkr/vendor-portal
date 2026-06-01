@@ -3,7 +3,7 @@ import { toText } from '../helpers'
 const CURRENCY_OPTIONS = [
   { value: '', label: 'Все валюты' },
   { value: '1000', label: 'RUB' },
-  { value: '2000', label: 'USDT-TRC20' },
+  { value: '2001', label: 'USDT TRC-20' },
 ]
 
 export function AccountsPage({
@@ -70,25 +70,33 @@ function TransactionList({ transactions }) {
 
   return (
     <div className="account-transaction-list">
-      {transactions.map((transaction) => (
-        <article key={toText(transaction.id)} className="account-transaction">
+      {transactions.map((transaction) => {
+        const view = buildTransactionView(transaction)
+
+        return (
+        <article key={view.id} className="account-transaction">
+          <span className={`account-transaction__icon account-transaction__icon--${view.tone}`}>{view.icon}</span>
+          <div className="account-transaction__body">
           <div className="account-transaction__main">
-            <strong>{formatTransactionType(transaction.type)}</strong>
-            <span>{formatDate(transaction.postedAt ?? transaction.posted_at ?? transaction.createdAt ?? transaction.created_at)}</span>
+            <strong>{view.title}</strong>
+            <span>{view.date}</span>
           </div>
           <div className="account-transaction__meta">
+            <span>{view.amounts.map((amount) => amount.currency).join(' / ') || 'Операция'}</span>
             <span>{toText(transaction.reason) || 'Без причины'}</span>
-            <span>{formatReference(transaction)}</span>
+            <span>{view.reference}</span>
           </div>
           <div className="account-entry-list">
-            {(transaction.entries || []).map((entry) => (
-              <span key={toText(entry.id)} className={entry.direction === 'ENTRY_DIRECTION_DEBIT' || entry.direction === 1 ? 'account-entry account-entry--debit' : 'account-entry'}>
-                {formatDirection(entry.direction)} {formatMoney(entry.money?.amount, entry.money?.currencyCode ?? entry.money?.currency_code)}
+            {view.amounts.map((amount) => (
+              <span key={`${view.id}-${amount.currency}`} className={`account-entry ${amount.sign === '-' ? 'account-entry--debit' : ''}`}>
+                {amount.sign} {amount.amount} {amount.currency}
               </span>
             ))}
           </div>
+          </div>
         </article>
-      ))}
+        )
+      })}
     </div>
   )
 }
@@ -103,8 +111,8 @@ function formatCurrency(currencyCode) {
   if (code === 1000) {
     return 'RUB'
   }
-  if (code === 2000) {
-    return 'USDT-TRC20'
+  if (code === 2001) {
+    return 'USDT'
   }
   return code ? `#${code}` : 'Валюта'
 }
@@ -149,4 +157,116 @@ function formatDate(value) {
     hour: '2-digit',
     minute: '2-digit',
   }).format(date)
+}
+
+function buildTransactionView(transaction) {
+  const type = normalizeTransactionType(transaction.type)
+  const referenceType = normalizeReferenceType(transaction.referenceType ?? transaction.reference_type)
+  const amounts = buildTransactionAmounts(transaction)
+  const firstAmount = amounts[0] || { sign: '', currency: '', amount: '0' }
+  const reason = toText(transaction.reason).toLowerCase()
+
+  return {
+    id: toText(transaction.id),
+    title: getTransactionTitle(type, referenceType, firstAmount.sign, reason),
+    icon: getTransactionIcon(type, firstAmount.sign),
+    tone: getTransactionTone(type, firstAmount.sign),
+    amounts,
+    date: formatDate(transaction.postedAt ?? transaction.posted_at ?? transaction.createdAt ?? transaction.created_at),
+    reference: formatReference(transaction),
+  }
+}
+
+function buildTransactionAmounts(transaction) {
+  const byCurrency = new Map()
+
+  for (const entry of transaction.entries || []) {
+    const currency = formatCurrency(entry.money?.currencyCode ?? entry.money?.currency_code)
+    const current = byCurrency.get(currency) || { credit: 0, debit: 0 }
+    const amount = parseAmount(entry.money?.amount)
+    if (isDebit(entry.direction)) {
+      current.debit += amount
+    } else {
+      current.credit += amount
+    }
+    byCurrency.set(currency, current)
+  }
+
+  return [...byCurrency.entries()].map(([currency, value]) => {
+    const net = value.credit - value.debit
+    return {
+      currency,
+      sign: net < 0 ? '-' : '+',
+      amount: formatAmount(Math.abs(net || value.credit || value.debit), currency),
+    }
+  })
+}
+
+function getTransactionTitle(type, referenceType, sign, reason) {
+  if (type === 'TOP_UP' || referenceType === 'TOP_UP' || (type === 'ADJUSTMENT' && sign === '+' && /deposit|top.?up|пополн/.test(reason))) {
+    return 'Пополнение'
+  }
+  if (type === 'WITHDRAWAL' || referenceType === 'WITHDRAWAL') {
+    return 'Вывод'
+  }
+  if (type === 'HOLD') {
+    return 'Резервирование'
+  }
+  if (type === 'CAPTURE') {
+    return 'Оплата заказа'
+  }
+  if (type === 'RELEASE') {
+    return 'Возврат резерва'
+  }
+  if (type === 'REFUND') {
+    return 'Возврат'
+  }
+  if (type === 'ADJUSTMENT') {
+    return sign === '-' ? 'Списание' : 'Корректировка'
+  }
+  return 'Операция по кошельку'
+}
+
+function getTransactionIcon(type, sign) {
+  if (type === 'WITHDRAWAL' || sign === '-') {
+    return '↑'
+  }
+  if (type === 'HOLD') {
+    return '•'
+  }
+  return '↓'
+}
+
+function getTransactionTone(type, sign) {
+  if (type === 'WITHDRAWAL' || sign === '-') {
+    return 'out'
+  }
+  if (['HOLD', 'CAPTURE'].includes(type)) {
+    return 'hold'
+  }
+  return 'in'
+}
+
+function normalizeTransactionType(value) {
+  return toText(value).replace(/^LEDGER_TRANSACTION_TYPE_/, '')
+}
+
+function normalizeReferenceType(value) {
+  return toText(value).replace(/^REFERENCE_TYPE_/, '')
+}
+
+function isDebit(value) {
+  return value === 'ENTRY_DIRECTION_DEBIT' || value === 1
+}
+
+function parseAmount(value) {
+  const parsed = Number.parseFloat(toText(value).replace(',', '.'))
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
+function formatAmount(amount, currency) {
+  return amount.toLocaleString('ru-RU', {
+    minimumFractionDigits: currency === 'USDT' ? 2 : 0,
+    maximumFractionDigits: currency === 'USDT' ? 8 : 0,
+  })
 }

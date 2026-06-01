@@ -2760,12 +2760,46 @@
 }
 
 .account-transaction {
-  display: grid;
+  display: flex;
   gap: 8px;
+  align-items: center;
   padding: 14px;
   border: 1px solid rgba(15, 23, 42, 0.1);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.82);
+}
+
+.account-transaction__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+  flex: 0 0 auto;
+  font-weight: 900;
+}
+
+.account-transaction__icon--in {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.account-transaction__icon--out {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.account-transaction__icon--hold {
+  background: #e0e7ff;
+  color: #4f46e5;
+}
+
+.account-transaction__body {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
 }
 
 .account-transaction__main,
@@ -2781,6 +2815,10 @@
 .account-transaction__meta {
   color: var(--muted-text, #64748b);
   font-size: 0.9rem;
+}
+
+.account-transaction__meta span:nth-child(2) {
+  display: none;
 }
 
 .account-entry-list {
